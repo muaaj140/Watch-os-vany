@@ -16,7 +16,7 @@ jobs:
       - name: Set up Build Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y p7zip-full brotli zip simg2img
+          sudo apt-get install -y p7zip-full brotli zip android-sdk-libsparse-utils
 
       - name: Download Google Light KitKat Base ROM
         run: |
