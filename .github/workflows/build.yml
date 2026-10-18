@@ -1,21 +1,68 @@
-name: Build Android APK
+name: Build Custom Light KitKat Virtual ROM
 
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
-  build:
+  build-rom:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Build Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y p7zip-full android-sdk-libsparse-utils brotli tools-matching
+
+      - name: Download Google Light KitKat Base ROM
+        run: |
+          echo "Downloading lightweight Google KitKat Base ROM..."
+          # এখানে আপনার কিটক্যাট স্টক জিপ রমের ডাইরেক্ট ডাউনলোড লিঙ্ক থাকবে
+          # wget -O base_rom.zip "https://example.com/path-to-kitkat-rom.zip"
+
+      - name: Extract System Image
+        run: |
+          echo "Extracting system.img from base ROM..."
+          # zip ফাইল থেকে system.img আনজিপ করার নির্দেশ
+          # unzip base_rom.zip system.img -d ./rom_work
+
+      - name: Inject System Apps & Custom Configurations
+        run: |
+          echo "Injecting pre-installed system apps..."
+          
+          # সিস্টেম অ্যাপ ডিরেক্টরি তৈরি (লক থাকা সিস্টেম অ্যাপের জন্য)
+          mkdir -p ./rom_work/system/app/
+          mkdir -p ./rom_work/system/priv-app/
+
+          # ১. মেসেঞ্জার (KitKat Era Messenger)
+          # cp ./my_apps/messenger_legacy.apk ./rom_work/system/app/
+
+          # ২. আপনার নিজস্ব কাস্টম ফ্ল্যাশলাইট অ্যাপ
+          # cp ./my_apps/vany_flashlight.apk ./rom_work/system/app/
+
+          # ৩. কাস্টম অনলাইন মিউজিক প্লেয়ার
+          # cp ./my_apps/custom_music_player.apk ./rom_work/system/app/
+
+          # ৪. লাইটওয়েট ইউটিউব লেগ্যাসি ভার্সন
+          # cp ./my_apps/youtube_legacy.apk ./rom_work/system/app/
+
+          # অ্যাপ পারমিশন ও লক সেট করা (যাতে আনইনস্টল বা ডিজেবল না করা যায়)
+          chmod -R 644 ./rom_work/system/app/*
+          chmod -R 644 ./rom_work/system/priv-app/*
+
+      - name: Repack System Image & Build Final ROM
+        run: |
+          echo "Repacking System Image into final ROM..."
+          # সিস্টেম ইমেজকে আবার রি-প্যাক করে জিপ ফাইল তৈরি করা
+          # zip -r Custom_KitKat_VANY_ROM.zip ./rom_work/*
+
+      - name: Upload Built ROM Package as Artifact
+        uses: actions/upload-artifact@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-      - name: Build with Gradle
-        run: ./gradlew assembleDebug
-        
+          name: Custom-KitKat-VANY-ROM
+          path: Custom_KitKat_VANY_ROM.zip
+          
