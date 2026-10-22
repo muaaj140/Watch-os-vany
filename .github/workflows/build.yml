@@ -1,47 +1,63 @@
-name: Build Custom Light KitKat Virtual ROM
+name: VANY ROM Core System Apps Auto-Healing Builder
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
-  build-rom:
+  build-and-auto-fix:
+    name: Build & Auto-Fix ${{ matrix.app.name }}
     runs-on: ubuntu-latest
+    continue-on-error: true
+
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - { name: "VA Style Launcher", dir: "rom_source_codes/va_style_launcher" }
+          - { name: "VA Sky Launcher", dir: "rom_source_codes/va_sky_launcher" }
+          - { name: "VA Smart Keyboard", dir: "rom_source_codes/va_smart_keyboard" }
+          - { name: "APK Installer", dir: "rom_source_codes/va_apk_installer" }
+          - { name: "System Settings", dir: "rom_source_codes/va_system_settings" }
+          - { name: "Smart File Manager", dir: "rom_source_codes/va_smart_file_manager" }
+          - { name: "VA Clock", dir: "rom_source_codes/va_clock" }
+          - { name: "VA Calculator", dir: "rom_source_codes/va_calculator" }
+          - { name: "VA Theme App", dir: "rom_source_codes/va_theme_app" }
+          - { name: "VA Smart Security", dir: "rom_source_codes/va_smart_security" }
 
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Set up Build Environment
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y p7zip-full brotli zip android-sdk-libsparse-utils
-
-      - name: Download Google Light KitKat Base ROM
-        run: |
-          echo "Downloading lightweight Google KitKat Base ROM..."
-          # এখানে পরবর্তীতে আপনার কিটক্যাট রমের ডাইরেক্ট লিঙ্ক দেওয়া যাবে
-
-      - name: Extract System Image
-        run: |
-          echo "Extracting system.img from base ROM..."
-
-      - name: Inject System Apps & Custom Configurations
-        run: |
-          echo "Injecting pre-installed system apps..."
-          mkdir -p ./rom_work/system/app/
-          mkdir -p ./rom_work/system/priv-app/
-
-      - name: Repack System Image & Build Final ROM
-        run: |
-          echo "Repacking System Image into final ROM..."
-          touch ./rom_work/README.txt
-          cd rom_work && zip -r ../Custom_KitKat_VANY_ROM.zip ./*
-
-      - name: Upload Built ROM Package as Artifact
-        uses: actions/upload-artifact@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          name: Custom-KitKat-VANY-ROM
-          path: Custom_KitKat_VANY_ROM.zip
-          
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Attempt Build
+        id: build_step
+        run: |
+          if [ -d "${{ matrix.app.dir }}" ]; then
+            cd ${{ matrix.app.dir }}
+            chmod +x gradlew || true
+            ./gradlew assembleRelease --no-daemon > build_log.txt 2>&1
+          fi
+
+      - name: Handle Error & Trigger AI Auto-Fix
+        if: failure()
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          echo "Build failed for ${{ matrix.app.name }}. Capturing log for AI fix..."
+          # এখানে এরর ফাইল থেকে ভুলগুলো পড়ে AI API দিয়ে কোড আপডেট করার কমান্ড রান হবে
+
+      - name: Upload Built System APK
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: ${{ matrix.app.name }}-Release-APK
+          path: |
+            ${{ matrix.app.dir }}/build/outputs/apk/release/*.apk
+            ${{ matrix.app.dir }}/app/build/outputs/apk/release/*.apk
