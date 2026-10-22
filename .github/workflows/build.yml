@@ -1,4 +1,4 @@
-name: VANY ROM Core System Apps Auto-Healing Builder
+name: VANY ROM System Apps Packer
 
 on:
   push:
@@ -6,28 +6,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-auto-fix:
-    name: Build & Auto-Fix ${{ matrix.app.name }}
+  build-and-pack:
+    name: Build and Inject into ROM Structure
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     strategy:
       fail-fast: false
       matrix:
         app:
-          - { name: "VA Style Launcher", dir: "rom_source_codes/va_style_launcher" }
-          - { name: "VA Sky Launcher", dir: "rom_source_codes/va_sky_launcher" }
-          - { name: "VA Smart Keyboard", dir: "rom_source_codes/va_smart_keyboard" }
-          - { name: "APK Installer", dir: "rom_source_codes/va_apk_installer" }
-          - { name: "System Settings", dir: "rom_source_codes/va_system_settings" }
-          - { name: "Smart File Manager", dir: "rom_source_codes/va_smart_file_manager" }
-          - { name: "VA Clock", dir: "rom_source_codes/va_clock" }
-          - { name: "VA Calculator", dir: "rom_source_codes/va_calculator" }
-          - { name: "VA Theme App", dir: "rom_source_codes/va_theme_app" }
-          - { name: "VA Smart Security", dir: "rom_source_codes/va_smart_security" }
+          - { name: "va_style_launcher", dir: "rom_source_codes/va_style_launcher" }
+          - { name: "va_sky_launcher", dir: "rom_source_codes/va_sky_launcher" }
+          - { name: "va_smart_keyboard", dir: "rom_source_codes/va_smart_keyboard" }
+          - { name: "va_apk_installer", dir: "rom_source_codes/va_apk_installer" }
+          - { name: "va_system_settings", dir: "rom_source_codes/va_system_settings" }
+          - { name: "va_smart_file_manager", dir: "rom_source_codes/va_smart_file_manager" }
+          - { name: "va_clock", dir: "rom_source_codes/va_clock" }
+          - { name: "va_calculator", dir: "rom_source_codes/va_calculator" }
+          - { name: "va_theme_app", dir: "rom_source_codes/va_theme_app" }
+          - { name: "va_smart_security", dir: "rom_source_codes/va_smart_security" }
 
     steps:
-      - name: Checkout Source Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -35,29 +34,37 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: 'gradle'
 
-      - name: Attempt Build
-        id: build_step
+      - name: Grant Gradle Wrapper Permission
+        run: |
+          if [ -f "${{ matrix.app.dir }}/gradlew" ]; then
+            chmod +x ${{ matrix.app.dir }}/gradlew
+          fi
+
+      - name: Build Release APK
         run: |
           if [ -d "${{ matrix.app.dir }}" ]; then
             cd ${{ matrix.app.dir }}
-            chmod +x gradlew || true
-            ./gradlew assembleRelease --no-daemon > build_log.txt 2>&1
+            if [ -f "./gradlew" ]; then
+              ./gradlew assembleRelease --no-daemon
+            else
+              gradle assembleRelease --no-daemon
+            fi
           fi
 
-      - name: Handle Error & Trigger AI Auto-Fix
-        if: failure()
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Inject APK into ROM System Directory
         run: |
-          echo "Build failed for ${{ matrix.app.name }}. Capturing log for AI fix..."
-          # এখানে এরর ফাইল থেকে ভুলগুলো পড়ে AI API দিয়ে কোড আপডেট করার কমান্ড রান হবে
+          # রম সোর্সের সিস্টেম অ্যাপ ফোল্ডার তৈরি (যেমন: android/system/app/)
+          ROM_SYSTEM_DIR="rom_output/system/app/${{ matrix.app.name }}"
+          mkdir -p "$ROM_SYSTEM_DIR"
+          
+          # বিল্ড হওয়া APK ফাইলটি খুঁজে রম ফোল্ডারে কপি করা
+          find "${{ matrix.app.dir }}" -name "*.apk" -exec cp {} "$ROM_SYSTEM_DIR/" \;
+          echo "Successfully injected ${{ matrix.app.name }} into ROM system structure!"
 
-      - name: Upload Built System APK
+      - name: Upload Complete ROM System Apps Package
         uses: actions/upload-artifact@v4
-        if: success()
         with:
-          name: ${{ matrix.app.name }}-Release-APK
-          path: |
-            ${{ matrix.app.dir }}/build/outputs/apk/release/*.apk
-            ${{ matrix.app.dir }}/app/build/outputs/apk/release/*.apk
+          name: VANY-ROM-System-Apps-Bundle
+          path: rom_output/
